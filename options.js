@@ -16,6 +16,52 @@ const CHECKBOX_FIELDS = ["weatherEnabled"]; // plain boolean checkboxes, not par
 const LOCAL_FIELDS = ["mapsApiKey"];
 const TRAVEL_MODES = ["BUS", "SUBWAY", "TRAIN", "LIGHT_RAIL", "RAIL"];
 
+// homeLat/homeLng aren't tied to a text input — they're set via the
+// geolocation button below — so they're tracked separately and only
+// written into the form (or storage) through renderLocationStatus()/save().
+let homeLat = null;
+let homeLng = null;
+
+function renderLocationStatus() {
+  const el = document.getElementById("locationStatus");
+  if (homeLat != null && homeLng != null) {
+    el.textContent = `Using detected location (${homeLat.toFixed(4)}, ${homeLng.toFixed(4)})`;
+    el.classList.add("set");
+  } else {
+    el.textContent = "Not set";
+    el.classList.remove("set");
+  }
+}
+
+document.getElementById("useLocation").addEventListener("click", () => {
+  const status = document.getElementById("locationStatus");
+  status.textContent = "Locating…";
+  status.classList.remove("set");
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      homeLat = pos.coords.latitude;
+      homeLng = pos.coords.longitude;
+      document.getElementById("homeAddress").value = ""; // detected location takes precedence
+      renderLocationStatus();
+    },
+    (err) => {
+      status.textContent = `Couldn't get location: ${err.message}`;
+    },
+    { enableHighAccuracy: false, timeout: 10000 }
+  );
+});
+
+// Typing a manual address overrides a previously detected location, so the
+// two never both apply at once — background.js only needs to check one.
+document.getElementById("homeAddress").addEventListener("input", () => {
+  if (homeLat != null || homeLng != null) {
+    homeLat = null;
+    homeLng = null;
+    renderLocationStatus();
+  }
+});
+
 // Populates the "Calendar to add blocks to" dropdown with every calendar on
 // the account (owned, shared, subscribed) — same call background.js makes —
 // so you pick from a real list instead of having to type a name or ID.
@@ -73,6 +119,8 @@ async function load() {
 
   const syncStored = await chrome.storage.sync.get({
     homeAddress: "",
+    homeLat: null,
+    homeLng: null,
     bufferMinutes: 5,
     pollMinutes: 15,
     blockUntilHour: 20,
@@ -98,6 +146,10 @@ async function load() {
   for (const mode of TRAVEL_MODES) {
     document.getElementById(`mode_${mode}`).checked = syncStored.allowedTravelModes.includes(mode);
   }
+
+  homeLat = syncStored.homeLat;
+  homeLng = syncStored.homeLng;
+  renderLocationStatus();
 }
 
 async function save() {
@@ -106,6 +158,8 @@ async function save() {
     const el = document.getElementById(key);
     syncValues[key] = el.type === "number" ? Number(el.value) : el.value.trim();
   }
+  syncValues.homeLat = homeLat;
+  syncValues.homeLng = homeLng;
 
   const checkedModes = TRAVEL_MODES.filter((mode) => document.getElementById(`mode_${mode}`).checked);
   // Treat "nothing checked" the same as "everything checked" — an empty

@@ -70,7 +70,17 @@ their own machine, and nobody can rack up API charges on someone else's account.
    - **Application restrictions → Websites**, add `chrome-extension://<your-extension-id>/*`
      so the key only works from your own installed copy of the extension.
 3. Click the extension's icon → **Settings**, paste the key into **Google Maps API
-   key**, fill in your home address, and click **Save settings**.
+   key**, set your home location (see below), and click **Save settings**.
+
+### Setting your home location
+
+Settings has two ways to set where transit times are calculated from:
+
+- **Use my current location** — uses your browser's built-in geolocation, free and with
+  no API key involved. Chrome will prompt for permission the first time. This is the
+  default and takes precedence whenever it's set.
+- **Type an address** — useful if you're configuring this from somewhere other than
+  home (e.g. ahead of a move). Typing here clears any detected location.
 
 ### 5. Connect your calendar
 
@@ -83,7 +93,7 @@ tab finishes loading.
 
 | Setting | What it does |
 |---|---|
-| Home / starting address | Origin for every transit calculation. |
+| Home location | Origin for every transit calculation — detected via geolocation or typed as an address. |
 | Google Maps API key | Your own key — see step 4 above. Local-only, never synced. |
 | Extra buffer (min) | Padding added on top of the raw transit estimate. |
 | Check every (min) | How often the background poll runs (minimum 5). |

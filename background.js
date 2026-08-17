@@ -95,6 +95,8 @@ async function setupAlarm() {
 async function runCheck() {
   const settings = await chrome.storage.sync.get({
     homeAddress: "",
+    homeLat: null,
+    homeLng: null,
     bufferMinutes: DEFAULT_BUFFER_MINUTES,
     blockUntilHour: DEFAULT_BLOCK_UNTIL_HOUR,
     targetCalendarId: "primary", // chosen from the dropdown in Settings
@@ -109,10 +111,19 @@ async function runCheck() {
   // so it never leaves this machine via Chrome account sync.
   const { mapsApiKey } = await chrome.storage.local.get({ mapsApiKey: "" });
 
-  if (!settings.homeAddress || !mapsApiKey) {
-    logStatus("Set your home address and Maps API key in Options first.", true);
+  const hasHomeLocation =
+    !!settings.homeAddress || (settings.homeLat != null && settings.homeLng != null);
+  if (!hasHomeLocation || !mapsApiKey) {
+    logStatus("Set your home location and Maps API key in Options first.", true);
     return;
   }
+  // A detected location (set via the "Use my current location" button)
+  // always takes precedence over a typed address — options.js keeps the two
+  // mutually exclusive, but this order matters if that ever changes.
+  const homeOrigin =
+    settings.homeLat != null && settings.homeLng != null
+      ? { location: { latLng: { latitude: settings.homeLat, longitude: settings.homeLng } } }
+      : { address: settings.homeAddress };
 
   const token = await getAuthToken(false);
   const calendars = await listAllCalendars(token);
@@ -139,7 +150,7 @@ async function runCheck() {
     if (!beforeBlock) {
       const eventStart = new Date(event.start.dateTime);
       const onTimeTransit = await getTransitInfo(
-        settings.homeAddress,
+        homeOrigin,
         event.location,
         event.start.dateTime,
         mapsApiKey,
@@ -158,7 +169,7 @@ async function runCheck() {
         const earlyMinutes = Number(settings.earlyOptionMinutes) || DEFAULT_EARLY_OPTION_MINUTES;
         const earlyArrivalDate = new Date(eventStart.getTime() - earlyMinutes * 60 * 1000);
         const earlyTransit = await getTransitInfo(
-          settings.homeAddress,
+          homeOrigin,
           event.location,
           earlyArrivalDate.toISOString(),
           mapsApiKey,
@@ -520,7 +531,7 @@ const ALL_TRAVEL_MODES = ["BUS", "SUBWAY", "TRAIN", "LIGHT_RAIL", "RAIL"];
 const DEFAULT_AVOID_KEYWORDS = "UP Express, Union Pearson";
 
 async function getTransitInfo(
-  originAddress,
+  origin,
   destinationAddress,
   arrivalTimeISO,
   apiKey,
@@ -550,7 +561,7 @@ async function getTransitInfo(
         "X-Goog-FieldMask": "routes.duration,routes.legs",
       },
       body: JSON.stringify({
-        origin: { address: originAddress },
+        origin,
         destination: { address: destinationAddress },
         travelMode: "TRANSIT",
         arrivalTime: arrivalTimeISO,
@@ -594,6 +605,13 @@ function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Word-boundary wrapped so a short numeric route ("7") doesn't also match
+// as a substring of a longer one ("107", "17", "70") — plain substring
+// matching would otherwise make those indistinguishable.
+function keywordPattern(keyword) {
+  return `\\b${escapeRegExp(keyword)}\\b`;
+}
+
 function routeDurationSeconds(route) {
   return route.duration ? parseInt(route.duration.replace("s", ""), 10) : Infinity;
 }
@@ -615,7 +633,7 @@ function routeTransitNames(route) {
 
 function routeMatchesAnyKeyword(route, keywords) {
   if (keywords.length === 0) return false;
-  const pattern = new RegExp(keywords.map(escapeRegExp).join("|"), "i");
+  const pattern = new RegExp(keywords.map(keywordPattern).join("|"), "i");
   return routeTransitNames(route).some((name) => pattern.test(name));
 }
 
@@ -628,7 +646,7 @@ function routePriorityScore(route, priorityKeywords) {
   let bestIndex = Infinity;
   priorityKeywords.forEach((keyword, index) => {
     if (index >= bestIndex) return;
-    const pattern = new RegExp(escapeRegExp(keyword), "i");
+    const pattern = new RegExp(keywordPattern(keyword), "i");
     if (names.some((name) => pattern.test(name))) bestIndex = index;
   });
   return bestIndex;
