@@ -74,6 +74,43 @@ document.getElementById("homeAddress").addEventListener("input", () => {
   }
 });
 
+function getAuthToken(interactive) {
+  return new Promise((resolve) => {
+    chrome.identity.getAuthToken({ interactive }, (t) => {
+      resolve(chrome.runtime.lastError ? null : t);
+    });
+  });
+}
+
+// Reflects connection state on the Connect button + "Connected as ..." line.
+// Shared by the initial (non-interactive) check and the Connect button's own
+// (interactive) flow, so both paths keep the UI in sync the same way.
+async function refreshConnectionUI(token) {
+  const btn = document.getElementById("connectCalendar");
+  const accountEl = document.getElementById("connectedAccount");
+
+  if (!token) {
+    btn.textContent = "Connect Google Calendar";
+    accountEl.style.display = "none";
+    accountEl.textContent = "";
+    return;
+  }
+
+  btn.textContent = "Reconnect Google Calendar";
+  try {
+    const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const info = await res.json();
+      accountEl.textContent = `Connected as ${info.email}`;
+      accountEl.style.display = "inline";
+    }
+  } catch {
+    // Non-fatal — the button label already reflects connection state.
+  }
+}
+
 // Populates the "Calendar to add blocks to" dropdown with every calendar on
 // the account (owned, shared, subscribed) — same call background.js makes —
 // so you pick from a real list instead of having to type a name or ID.
@@ -81,14 +118,11 @@ async function loadCalendarOptions() {
   const hint = document.getElementById("calendarListHint");
   const select = document.getElementById("targetCalendarId");
 
-  const token = await new Promise((resolve) => {
-    chrome.identity.getAuthToken({ interactive: false }, (t) => {
-      resolve(chrome.runtime.lastError ? null : t);
-    });
-  });
+  const token = await getAuthToken(false);
+  await refreshConnectionUI(token);
 
   if (!token) {
-    hint.textContent = 'Connect Google Calendar from the popup first to see your calendar list — "Primary calendar" still works meanwhile.';
+    hint.textContent = "Connect above to see your calendars.";
     return;
   }
 
@@ -123,6 +157,27 @@ async function loadCalendarOptions() {
     hint.textContent = "Couldn't load your calendar list right now. You can still use \"Primary calendar\".";
   }
 }
+
+document.getElementById("connectCalendar").addEventListener("click", async () => {
+  const hint = document.getElementById("calendarListHint");
+  const select = document.getElementById("targetCalendarId");
+  const previousSelection = select.value;
+
+  hint.textContent = "Connecting…";
+  const token = await getAuthToken(true);
+  if (!token) {
+    hint.textContent = "Connection failed — try again.";
+    return;
+  }
+
+  // Reset to just the default option before repopulating, so reconnecting
+  // doesn't duplicate entries an earlier connect already added.
+  select.innerHTML = '<option value="primary">Primary calendar</option>';
+  await loadCalendarOptions();
+  if ([...select.options].some((o) => o.value === previousSelection)) {
+    select.value = previousSelection;
+  }
+});
 
 async function load() {
   // Populate the dropdown's options *before* setting its value from storage,

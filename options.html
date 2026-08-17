@@ -74,6 +74,13 @@
     .keyRow { display: flex; gap: 8px; align-items: center; }
     .keyRow input { flex: 1; }
     .locationRow { display: flex; gap: 8px; align-items: center; }
+    .connectRow { display: flex; gap: 8px; align-items: center; }
+    #connectedAccount {
+      font-size: 12px;
+      color: var(--success);
+      font-weight: 600;
+      display: none;
+    }
     button {
       font: inherit;
       cursor: pointer;
@@ -165,6 +172,23 @@
     </section>
 
     <section class="card">
+      <h2>Google Calendar</h2>
+      <div class="field">
+        <div class="connectRow">
+          <button type="button" id="connectCalendar" class="btn-secondary">Connect Google Calendar</button>
+          <span id="connectedAccount"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="targetCalendarId">Calendar to add commute/evening blocks to</label>
+        <select id="targetCalendarId">
+          <option value="primary">Primary calendar</option>
+        </select>
+        <p class="hint" id="calendarListHint">Connect above to see your calendars.</p>
+      </div>
+    </section>
+
+    <section class="card">
       <h2>Timing &amp; blocking</h2>
       <div class="row">
         <div class="field">
@@ -179,13 +203,6 @@
       <div class="field">
         <label for="blockUntilHour">After an in-person event, block the evening until (24h)</label>
         <input id="blockUntilHour" type="number" min="0" max="23" value="20" />
-      </div>
-      <div class="field">
-        <label for="targetCalendarId">Calendar to add commute/evening blocks to</label>
-        <select id="targetCalendarId">
-          <option value="primary">Primary calendar</option>
-        </select>
-        <p class="hint" id="calendarListHint">Loading your calendars…</p>
       </div>
     </section>
 
