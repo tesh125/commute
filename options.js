@@ -17,33 +17,48 @@ const LOCAL_FIELDS = ["mapsApiKey"];
 const TRAVEL_MODES = ["BUS", "SUBWAY", "TRAIN", "LIGHT_RAIL", "RAIL"];
 
 // homeLat/homeLng aren't tied to a text input — they're set via the
-// geolocation button below — so they're tracked separately and only
-// written into the form (or storage) through renderLocationStatus()/save().
+// geolocation button below — so they're tracked separately from the visible
+// address field, even though clicking the button fills that field too (with
+// a reverse-geocoded label) for a human-readable confirmation of the result.
 let homeLat = null;
 let homeLng = null;
 
-function renderLocationStatus() {
-  const el = document.getElementById("locationStatus");
-  if (homeLat != null && homeLng != null) {
-    el.textContent = `Using detected location (${homeLat.toFixed(4)}, ${homeLng.toFixed(4)})`;
-    el.classList.add("set");
-  } else {
-    el.textContent = "Not set";
-    el.classList.remove("set");
-  }
-}
-
 document.getElementById("useLocation").addEventListener("click", () => {
   const status = document.getElementById("locationStatus");
+  const addressInput = document.getElementById("homeAddress");
   status.textContent = "Locating…";
-  status.classList.remove("set");
 
   navigator.geolocation.getCurrentPosition(
-    (pos) => {
+    async (pos) => {
       homeLat = pos.coords.latitude;
       homeLng = pos.coords.longitude;
-      document.getElementById("homeAddress").value = ""; // detected location takes precedence
-      renderLocationStatus();
+
+      const apiKey = document.getElementById("mapsApiKey").value.trim();
+      if (!apiKey) {
+        status.textContent = "Location detected — add your Maps API key above to show it as an address.";
+        return;
+      }
+
+      // Reverse-geocode purely to fill the address field with something
+      // readable. background.js still uses the coordinates directly for
+      // routing (see homeOrigin in runCheck()) — this call doesn't affect
+      // accuracy, it's just a label.
+      try {
+        const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+        url.searchParams.set("latlng", `${homeLat},${homeLng}`);
+        url.searchParams.set("key", apiKey);
+        const res = await fetch(url);
+        const data = await res.json();
+        const formatted = data.results?.[0]?.formatted_address;
+        if (formatted) {
+          addressInput.value = formatted;
+          status.textContent = "";
+        } else {
+          status.textContent = "Location detected, but couldn't resolve it to an address.";
+        }
+      } catch {
+        status.textContent = "Location detected, but the address lookup failed.";
+      }
     },
     (err) => {
       // GeolocationPositionError codes: 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT.
@@ -66,12 +81,11 @@ document.getElementById("useLocation").addEventListener("click", () => {
 
 // Typing a manual address overrides a previously detected location, so the
 // two never both apply at once — background.js only needs to check one.
+// (Setting addressInput.value programmatically above doesn't fire this, so
+// the coordinates survive the reverse-geocoded label being filled in.)
 document.getElementById("homeAddress").addEventListener("input", () => {
-  if (homeLat != null || homeLng != null) {
-    homeLat = null;
-    homeLng = null;
-    renderLocationStatus();
-  }
+  homeLat = null;
+  homeLng = null;
 });
 
 function getAuthToken(interactive) {
@@ -216,7 +230,6 @@ async function load() {
 
   homeLat = syncStored.homeLat;
   homeLng = syncStored.homeLng;
-  renderLocationStatus();
 }
 
 async function save() {

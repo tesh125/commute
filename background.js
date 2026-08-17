@@ -142,6 +142,7 @@ async function runCheck() {
   const events = await listUpcomingEvents(token, calendars);
 
   let created = 0;
+  let transitFailures = 0; // events with a location where the Routes API call didn't return a route
   for (const event of events) {
     if (shouldSkip(event)) continue;
 
@@ -158,7 +159,9 @@ async function runCheck() {
         settings.avoidKeywords,
         settings.priorityKeywords
       );
-      if (onTimeTransit != null) {
+      if (onTimeTransit == null) {
+        transitFailures++;
+      } else {
         const bufferSeconds = (Number(settings.bufferMinutes) || 0) * 60;
         const commuteStart = new Date(
           eventStart.getTime() - (onTimeTransit.durationSeconds + bufferSeconds) * 1000
@@ -237,11 +240,18 @@ async function runCheck() {
     }
   }
 
-  logStatus(
-    created > 0
-      ? `Created ${created} block(s) at ${new Date().toLocaleTimeString()}`
-      : `Checked at ${new Date().toLocaleTimeString()} — nothing new`
-  );
+  const time = new Date().toLocaleTimeString();
+  if (transitFailures > 0) {
+    const createdPart = created > 0 ? `Created ${created} block(s), but transit` : "Transit";
+    logStatus(
+      `${createdPart} lookup failed for ${transitFailures} event(s) at ${time} — check your Maps API key and its restrictions (see the extension's service worker console for details).`,
+      true
+    );
+  } else {
+    logStatus(
+      created > 0 ? `Created ${created} block(s) at ${time}` : `Checked at ${time} — nothing new`
+    );
+  }
 }
 
 // Matches video-call links/domains people commonly paste into the location
