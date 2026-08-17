@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Commute Blocker — Options</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      width: 380px;
+      padding: 16px 20px;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 16px; margin-bottom: 4px; }
+    p.hint { font-size: 12px; color: #666; margin-top: 2px; margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-top: 14px; }
+    input, select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 7px 8px;
+      margin-top: 4px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: white;
+    }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    .keyRow { display: flex; gap: 6px; align-items: flex-start; }
+    .keyRow input { flex: 1; }
+    .keyRow button {
+      margin-top: 4px;
+      padding: 7px 10px;
+      font-size: 12px;
+      background: #eee;
+      color: #1a1a1a;
+    }
+    .keyRow button:hover { background: #ddd; }
+    .modeGrid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 14px;
+      margin-top: 6px;
+    }
+    .modeGrid label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      font-weight: normal;
+      margin-top: 0;
+    }
+    .modeGrid input[type="checkbox"] {
+      width: auto;
+      margin-top: 0;
+    }
+    button {
+      margin-top: 18px;
+      padding: 8px 14px;
+      font-size: 13px;
+      border: none;
+      border-radius: 6px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    #saved {
+      display: none;
+      margin-top: 10px;
+      font-size: 12px;
+      color: #16a34a;
+    }
+  </style>
+</head>
+<body>
+  <h1>Commute Blocker settings</h1>
+  <p class="hint">Most settings sync across your signed-in Chrome instances. The Maps API key is the exception — see below.</p>
+
+  <label for="homeAddress">Home / starting address</label>
+  <input id="homeAddress" type="text" placeholder="123 Main St, Springfield, IL" />
+
+  <label for="mapsApiKey">Google Maps API key (Routes API enabled)</label>
+  <div class="keyRow">
+    <input id="mapsApiKey" type="password" placeholder="AIza..." autocomplete="off" />
+    <button id="toggleKey" type="button">Show</button>
+  </div>
+  <p class="hint" style="margin-top:4px;margin-bottom:0;">Stored locally on this device only — never synced to your Google account or shown in plain text unless you click Show.</p>
+
+  <div class="row">
+    <div>
+      <label for="bufferMinutes">Extra buffer (min)</label>
+      <input id="bufferMinutes" type="number" min="0" value="5" />
+    </div>
+    <div>
+      <label for="pollMinutes">Check every (min)</label>
+      <input id="pollMinutes" type="number" min="5" value="15" />
+    </div>
+  </div>
+
+  <label for="blockUntilHour">After an in-person event, block the evening until (24h)</label>
+  <input id="blockUntilHour" type="number" min="0" max="23" value="20" />
+  <p class="hint" style="margin-top:4px;margin-bottom:0;">20 = 8pm. If the event already ends after this hour, nothing extra is blocked.</p>
+
+  <label for="targetCalendarId">Calendar to add commute/evening blocks to</label>
+  <select id="targetCalendarId">
+    <option value="primary">Primary calendar</option>
+  </select>
+  <p class="hint" id="calendarListHint" style="margin-top:4px;margin-bottom:0;">Loading your calendars…</p>
+
+  <label>Transit types to allow</label>
+  <div class="modeGrid">
+    <label><input type="checkbox" id="mode_BUS" checked /> Bus</label>
+    <label><input type="checkbox" id="mode_SUBWAY" checked /> Subway</label>
+    <label><input type="checkbox" id="mode_TRAIN" checked /> Train</label>
+    <label><input type="checkbox" id="mode_LIGHT_RAIL" checked /> Light rail</label>
+    <label><input type="checkbox" id="mode_RAIL" checked /> Rail</label>
+  </div>
+  <p class="hint" style="margin-top:4px;margin-bottom:0;">Uncheck a type to exclude it entirely (e.g. no buses). This is a broad category filter from Google, not a specific line — see the "avoid" field below for that.</p>
+
+  <label for="avoidKeywords">Avoid transit lines/agencies (comma-separated)</label>
+  <input id="avoidKeywords" type="text" placeholder="UP Express, Union Pearson" />
+  <p class="hint" style="margin-top:4px;margin-bottom:0;">Matched against each route's line/agency name. If every available route uses an avoided line, it's used anyway rather than showing no route.</p>
+
+  <label for="priorityKeywords">Prioritize transit lines (comma-separated, most preferred first)</label>
+  <input id="priorityKeywords" type="text" placeholder="GO Train, Line 1, Line 2" />
+  <p class="hint" style="margin-top:4px;margin-bottom:0;">Among routes that pass the "avoid" filter, prefers whichever mentions your earliest-listed keyword. Duration only breaks ties — it won't override your ranking.</p>
+
+  <label for="earlyOptionMinutes">Also show an "earlier" option, this many minutes ahead (min)</label>
+  <input id="earlyOptionMinutes" type="number" min="0" value="20" />
+  <p class="hint" style="margin-top:4px;margin-bottom:0;">Makes a second Routes API call targeting an earlier arrival, shown alongside the on-time itinerary in the block's description. Uses more Maps API quota per event.</p>
+
+  <label style="display:flex; align-items:center; gap:6px; margin-top:14px;">
+    <input type="checkbox" id="weatherEnabled" checked style="width:auto; margin-top:0;" />
+    Add a weather forecast to the commute block
+  </label>
+  <label for="weatherLeadDays">Check weather this many days before the event</label>
+  <input id="weatherLeadDays" type="number" min="0" max="9" value="2" />
+  <p class="hint" style="margin-top:4px;margin-bottom:0;">Checked once, not repeated — as soon as the event is this many days out (or closer), the forecast for its location is added to the commute block and won't be re-fetched. Uses the Geocoding API and Weather API with the same Maps API key above (make sure both are enabled in Cloud Console).</p>
+
+  <button id="save">Save settings</button>
+  <div id="saved">Saved.</div>
+
+  <script src="options.js"></script>
+</body>
+</html>
