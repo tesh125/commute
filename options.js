@@ -46,7 +46,19 @@ document.getElementById("useLocation").addEventListener("click", () => {
       renderLocationStatus();
     },
     (err) => {
-      status.textContent = `Couldn't get location: ${err.message}`;
+      // GeolocationPositionError codes: 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT.
+      // The raw err.message for code 2 ("Position update is unavailable") doesn't explain
+      // *why* — usually OS-level Location Services being off, or no Wi-Fi radio for the
+      // desktop location provider to use — so point at the fix instead of just echoing it.
+      if (err.code === 2) {
+        status.textContent =
+          "Couldn't detect a location — check that Location Services is turned on for Chrome in your OS settings, or use the address field below instead.";
+      } else if (err.code === 1) {
+        status.textContent =
+          "Location permission denied — allow it for this extension in Chrome, or use the address field below instead.";
+      } else {
+        status.textContent = `Couldn't get location: ${err.message}`;
+      }
     },
     { enableHighAccuracy: false, timeout: 10000 }
   );
